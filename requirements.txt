@@ -4,8 +4,8 @@ plotly==6.0.0
 tensorflow==2.18.0
 joblib==1.4.2
 scikit-learn==1.6.1
-pandas==2.3.2
-numpy==2.3.3
+pandas>=2.0.0,<2.3.0
+numpy>=1.26.0,<2.1.0
 matplotlib==3.10.1
 gunicorn==23.0.0
 whitenoise==6.9.0
