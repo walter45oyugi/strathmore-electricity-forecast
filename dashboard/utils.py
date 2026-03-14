@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Any
 
@@ -11,10 +12,8 @@ try:
 except Exception:  # pragma: no cover
     joblib = None
 
-try:
-    from tensorflow.keras.models import load_model
-except Exception:  # pragma: no cover
-    load_model = None
+# TensorFlow is imported lazily inside load_forecasting_artifacts() to avoid
+# slow startup on pages that don't need the LSTM (e.g. overview).
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -90,9 +89,17 @@ def load_forecasting_artifacts() -> tuple[Any, Any]:
         )
         return None, None
 
-    if load_model is None or joblib is None:
+    if joblib is None:
         _ARTIFACT_CACHE["error"] = (
-            "TensorFlow or joblib is not installed, so the saved model could not be loaded."
+            "joblib is not installed, so the saved model could not be loaded."
+        )
+        return None, None
+
+    try:
+        from tensorflow.keras.models import load_model
+    except Exception:
+        _ARTIFACT_CACHE["error"] = (
+            "TensorFlow is not installed, so the saved model could not be loaded."
         )
         return None, None
 
@@ -304,12 +311,21 @@ def load_and_prepare_data(source: str | Path | pd.DataFrame) -> pd.DataFrame:
     return clean_meter_data(raw)
 
 
+_DATA_CACHE: dict[str, Any] = {"df": None, "mtime": 0.0}
+_DATA_CACHE_TTL = 300  # seconds
+
 def load_default_data() -> pd.DataFrame:
     if not DATA_PATH.exists():
         raise FileNotFoundError(
             "No default cleaned dataset was found in 'ml models/cleaned_data.csv'."
         )
-    return load_and_prepare_data(DATA_PATH)
+    now = time.time()
+    if _DATA_CACHE["df"] is not None and (now - _DATA_CACHE["mtime"]) < _DATA_CACHE_TTL:
+        return _DATA_CACHE["df"]
+    df = load_and_prepare_data(DATA_PATH)
+    _DATA_CACHE["df"] = df
+    _DATA_CACHE["mtime"] = now
+    return df
 
 
 def _feature_columns(df: pd.DataFrame) -> list[str]:
