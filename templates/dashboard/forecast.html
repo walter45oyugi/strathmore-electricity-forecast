@@ -1,0 +1,179 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}24-Hour Forecast — Electricity Dashboard{% endblock %}
+
+{% block content %}
+    <style>
+        .forecast-intro { margin: 0; color: #4b5563; }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-label {
+            font-size: 13px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .kpi-value {
+            margin-top: 10px;
+            font-size: 28px;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .kpi-meta {
+            margin-top: 6px;
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        .method-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+            background: {% if method == "lstm" %}#dcfce7{% else %}#fef9c3{% endif %};
+            color: {% if method == "lstm" %}#15803d{% else %}#92400e{% endif %};
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .chart-title { margin: 0 0 6px; }
+        .chart-subtitle { margin: 0; color: #6b7280; font-size: 14px; }
+
+        .plotly-chart { width: 100%; min-height: 480px; }
+
+        .forecast-table-wrap { overflow-x: auto; }
+
+        .forecast-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .forecast-table th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+            padding: 11px 14px;
+            border-bottom: 2px solid #e5e7eb;
+            text-align: left;
+        }
+
+        .forecast-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #f3f4f6;
+            color: #1f2937;
+        }
+
+        .forecast-table tr:hover td { background: #fafafa; }
+
+        .peak-row td { font-weight: 700; color: #b91c1c; }
+
+        .model-note {
+            margin-top: 14px;
+            font-size: 13px;
+            color: #6b7280;
+        }
+    </style>
+
+    <div class="topbar">
+        <div>
+            <h1>24-Hour Active Power Forecast</h1>
+            <p class="forecast-intro">
+                LSTM model forecast from <strong>{{ data_end|date:"M d, Y H:i" }}</strong>
+                covering the next 24 hours.
+            </p>
+        </div>
+        <div style="display:flex; gap:12px; align-items:center;">
+            <a class="button" style="background:#b91c1c;" href="{% url 'forecast' %}">&#8635; Run Forecast</a>
+            <a class="button" href="{% url 'overview' %}">Back to Overview</a>
+        </div>
+    </div>
+
+    <div class="kpi-grid">
+        <div class="card">
+            <div class="kpi-label">Forecast Peak</div>
+            <div class="kpi-value">{{ peak_kw|floatformat:2 }} kW</div>
+            <div class="kpi-meta">Highest predicted demand in the next 24 h.</div>
+        </div>
+        <div class="card">
+            <div class="kpi-label">Forecast Mean</div>
+            <div class="kpi-value">{{ mean_kw|floatformat:2 }} kW</div>
+            <div class="kpi-meta">Average predicted demand over the forecast window.</div>
+        </div>
+        <div class="card">
+            <div class="kpi-label">Forecast Window</div>
+            <div class="kpi-value" style="font-size:18px;">
+                {{ forecast_start|date:"M d, H:i" }} &rarr; {{ forecast_end|date:"M d, H:i" }}
+            </div>
+            <div class="kpi-meta">Start and end of the 24-hour horizon.</div>
+        </div>
+        <div class="card">
+            <div class="kpi-label">Model Used</div>
+            <div class="kpi-value" style="font-size: 20px; padding-top: 6px;">
+                <span class="method-badge">{{ method|upper }}</span>
+            </div>
+            <div class="kpi-meta">
+                {% if model_status.model_available and model_status.scaler_available %}
+                    Saved LSTM artefacts loaded successfully.
+                {% else %}
+                    Hourly-baseline fallback is active — LSTM artefacts not found.
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="chart-header">
+            <div>
+                <h2 class="chart-title">Actual vs Forecast — Active Power</h2>
+                <p class="chart-subtitle">
+                    Last 48 hours of metered data (grey) and next 24-hour LSTM forecast (red dashed).
+                    The dotted vertical line marks the forecast origin.
+                </p>
+            </div>
+        </div>
+        <div class="plotly-chart">{{ forecast_chart }}</div>
+    </div>
+
+    <div class="card">
+        <h2 style="margin: 0 0 16px;">Hourly Forecast Table</h2>
+        <div class="forecast-table-wrap">
+            <table class="forecast-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Timestamp</th>
+                        <th>Forecast (kW)</th>
+                        <th>Model</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in forecast %}
+                    <tr {% if row.forecast_kw == peak_kw %}class="peak-row"{% endif %}>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ row.timestamp }}</td>
+                        <td>{{ row.forecast_kw|floatformat:2 }}</td>
+                        <td>{{ row.method|upper }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="model-note">Peak demand hour is highlighted in red.</p>
+    </div>
+{% endblock %}

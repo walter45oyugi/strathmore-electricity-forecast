@@ -1,0 +1,187 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Electricity Forecast Dashboard{% endblock %}
+
+{% block content %}
+    <style>
+        .overview-intro {
+            margin: 0;
+            color: #4b5563;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-label {
+            font-size: 14px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .kpi-value {
+            margin-top: 10px;
+            font-size: 30px;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .kpi-meta {
+            margin-top: 8px;
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .chart-title {
+            margin: 0 0 8px;
+        }
+
+        .chart-subtitle {
+            margin: 0;
+            color: #6b7280;
+        }
+
+        .chart-controls {
+            min-width: 180px;
+        }
+
+        .chart-controls label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .chart-controls select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background: white;
+            color: #111827;
+        }
+
+        .plotly-chart {
+            width: 100%;
+            min-height: 420px;
+        }
+
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 24px;
+        }
+
+        .chart-grid .card {
+            margin-bottom: 0;
+        }
+
+        @media (max-width: 900px) {
+            .chart-header {
+                flex-direction: column;
+            }
+
+            .chart-controls {
+                width: 100%;
+            }
+
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+
+    <div class="topbar">
+        <div>
+            <h1>Strathmore Electricity Forecast Dashboard</h1>
+            <p class="overview-intro">Operational KPIs and active power trend analysis.</p>
+        </div>
+        <a class="button" href="{% url 'forecast' %}">24-Hour Forecast</a>
+    </div>
+
+    <div class="kpi-grid">
+        <div class="card">
+            <div class="kpi-label">Mean Demand</div>
+            <div class="kpi-value">{{ stats.mean|floatformat:2 }} kW</div>
+            <div class="kpi-meta">Average active power across the full dataset.</div>
+        </div>
+        <div class="card">
+            <div class="kpi-label">Peak Demand</div>
+            <div class="kpi-value">{{ stats.max|floatformat:2 }} kW</div>
+            <div class="kpi-meta">Highest recorded active power value.</div>
+        </div>
+        <div class="card">
+            <div class="kpi-label">Average Current</div>
+            <div class="kpi-value">
+                {% if avg_current is not None %}{{ avg_current|floatformat:2 }} A{% else %}N/A{% endif %}
+            </div>
+            <div class="kpi-meta">Average across phases A, B, and C.</div>
+        </div>
+        <div class="card">
+            <div class="kpi-label">Average Voltage</div>
+            <div class="kpi-value">
+                {% if avg_voltage is not None %}{{ avg_voltage|floatformat:2 }} V{% else %}N/A{% endif %}
+            </div>
+            <div class="kpi-meta">Mean phase voltage over the reporting window.</div>
+        </div>
+        <div class="card">
+            <div class="kpi-label">Power Factor</div>
+            <div class="kpi-value">
+                {% if avg_power_factor is not None %}{{ avg_power_factor|floatformat:2 }}%{% else %}N/A{% endif %}
+            </div>
+            <div class="kpi-meta">Mean power factor for the monitored load.</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="chart-header">
+            <div>
+                <h2 class="chart-title">Active Power Trend</h2>
+                <p class="chart-subtitle">
+                    Dataset window: {{ date_start|date:"M d, Y H:i" }} to {{ date_end|date:"M d, Y H:i" }}
+                </p>
+            </div>
+            <div class="chart-controls">
+                <label>Trend granularity</label>
+                <select disabled>
+                    <option>Use chart dropdown</option>
+                </select>
+            </div>
+        </div>
+        <div class="plotly-chart">{{ active_power_chart }}</div>
+    </div>
+
+    <div class="chart-grid">
+        <div class="card">
+            <div class="chart-header">
+                <div>
+                    <h2 class="chart-title">Voltage Trend by Phase</h2>
+                    <p class="chart-subtitle">Daily phase trend with outliers removed and axis capped to the operational voltage band.</p>
+                </div>
+            </div>
+            <div class="plotly-chart">{{ voltage_chart }}</div>
+        </div>
+
+        <div class="card">
+            <div class="chart-header">
+                <div>
+                    <h2 class="chart-title">Current Trend by Phase</h2>
+                    <p class="chart-subtitle">Daily phase trend with extreme spikes removed and a fixed current cap for readability.</p>
+                </div>
+            </div>
+            <div class="plotly-chart">{{ current_chart }}</div>
+        </div>
+    </div>
+{% endblock %}

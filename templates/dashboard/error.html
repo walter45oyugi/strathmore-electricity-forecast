@@ -1,0 +1,11 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Dashboard Error{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <h1>Dashboard Error</h1>
+        <p><a href="{% url 'overview' %}">Back to dashboard overview</a></p>
+        <p class="error">{{ error }}</p>
+    </div>
+{% endblock %}
